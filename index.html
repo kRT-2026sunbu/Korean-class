@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>초성·중성·종성 탈출기! 음운 결합 마스터</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter & Noto Sans KR -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', 'Inter', sans-serif;
+        }
+        /* 애니메이션 효과 */
+        @keyframes pulse-slow {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+        .pulse-active {
+            animation: pulse-slow 2s infinite ease-in-out;
+        }
+        /* 턴 교대 애니메이션 */
+        @keyframes turn-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+        .active-turn-anim {
+            animation: turn-bounce 1s infinite ease-in-out;
+        }
+        /* 긴박한 최종 카운트다운 애니메이션 */
+        @keyframes dramatic-pulse {
+            0% { transform: scale(0.4); opacity: 0; }
+            15% { opacity: 0.9; }
+            100% { transform: scale(1.7); opacity: 0; }
+        }
+        .animate-pulse-dramatic {
+            animation: dramatic-pulse 0.95s forwards ease-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden selection:bg-violet-500 selection:text-white">
+
+    <script>
+        // Web Audio API를 활용한 효과음 발생기 (외부 파일 로드 없이 즉시 구동)
+        const SoundFX = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            play(type) {
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    if (type === 'correct') {
+                        // 딩동댕 소리
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(523.25, now); // C5
+                        osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                        gain.gain.setValueAtTime(0.3, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                        osc.start(now);
+                        osc.stop(now + 0.35);
+                    } else if (type === 'wrong') {
+                        // 삐- 소리
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(220, now); // A3
+                        osc.frequency.setValueAtTime(180, now + 0.15);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                        osc.start(now);
+                        osc.stop(now + 0.3);
+                    } else if (type === 'tick') {
+                        // 째깍 소리
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(800, now);
+                        gain.gain.setValueAtTime(0.15, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                        osc.start(now);
+                        osc.stop(now + 0.05);
+                    } else if (type === 'warning') {
+                        // 긴박한 알림음
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(440, now);
+                        osc.frequency.setValueAtTime(330, now + 0.1);
+                        gain.gain.setValueAtTime(0.15, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                        osc.start(now);
+                        osc.stop(now + 0.2);
+                    } else if (type === 'round_start') {
+                        // 라운드 시작 팡파레
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(392.00, now); // G4
+                        osc.frequency.setValueAtTime(523.25, now + 0.1); // C5
+                        osc.frequency.setValueAtTime(659.25, now + 0.2); // E5
+                        osc.frequency.setValueAtTime(783.99, now + 0.3); // G5
+                        gain.gain.setValueAtTime(0.25, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                        osc.start(now);
+                        osc.stop(now + 0.6);
+                    } else if (type === 'game_over') {
+                        // 게임 종료 휘슬
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(523.25, now);
+                        osc.frequency.exponentialRampToValueAtTime(261.63, now + 0.8);
+                        gain.gain.setValueAtTime(0.3, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                        osc.start(now);
+                        osc.stop(now + 0.8);
+                    } else if (type === 'turn_switch') {
+                        // 턴 체인지 소리 (슝~)
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(300, now);
+                        osc.frequency.exponentialRampToValueAtTime(600, now + 0.25);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                        osc.start(now);
+                        osc.stop(now + 0.25);
+                    } else if (type === 'urgent_tick') {
+                        // 마지막 5초 전용 고주파 날카로운 긴박한 타이머 경고음
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(987.77, now); // B5 고음
+                        osc.frequency.setValueAtTime(493.88, now + 0.08); // B4
+                        gain.gain.setValueAtTime(0.35, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                        osc.start(now);
+                        osc.stop(now + 0.15);
+                    }
+                } catch (e) {
+                    console.warn("Audio Context init blocked or not supported:", e);
+                }
+            }
+        };
+    </script>
+
+    <script>
+        // 한글 자음/모음 분해용 데이터 사전
+        const CHOSEONG = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+        const JUNGSEONG = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ', 'ㅘ', 'ㅙ', 'ㅚ', 'ㅛ', 'ㅜ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅠ', 'ㅡ', 'ㅢ', 'ㅣ'];
+        const JONGSEONG = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+
+        /**
+         * 한 글자 음절을 초성, 중성, 종성으로 분해합니다.
+         * @param {string} char 
+         */
+        function decomposeHangul(char) {
+            if (!char || char.length !== 1) return null;
+            const code = char.charCodeAt(0);
+            
+            // 한글 음절 유니코드 범위 (가 ~ 힣)
+            if (code >= 0xAC00 && code <= 0xD7A3) {
+                const index = code - 0xAC00;
+                const choIdx = Math.floor(index / 588);
+                const jungIdx = Math.floor((index % 588) / 28);
+                const jongIdx = index % 28;
+                return {
+                    type: 'syllable',
+                    cho: CHOSEONG[choIdx],
+                    jung: JUNGSEONG[jungIdx],
+                    jong: JONGSEONG[jongIdx],
+                    hasInitialSound: CHOSEONG[choIdx] !== 'ㅇ', // 'ㅇ'은 첫소리에서 음가가 없음
+                    hasFinalSound: jongIdx !== 0
+                };
+            }
+            
+            // 한글 자모 단독 입력 처리 (혹시 모를 대비)
+            if (code >= 0x3131 && code <= 0x314E) {
+                return { type: 'jaum', val: char };
+            }
+            if (code >= 0x314F && code <= 0x3163) {
+                return { type: 'moum', val: char };
+            }
+            
+            return null;
+        }
+    </script>
+
+    <script>
+        // 실제 단어로 인정할 만한 주요 한 글자 데이터베이스 (수업 목적의 예외 허용을 위해 '선생님 패스' 기능 탑재)
+        const DICTIONARIES = {
+            1: ["아", "오", "이", "우", "에", "애", "외", "위", "의", "야", "어", "요", "유", "얘", "예", "와", "워", "으"],
+            2: [
+                "가", "나", "다", "라", "마", "바", "사", "자", "차", "카", "타", "파", "하", 
+                "개", "게", "깨", "꼬", "꾸", "끼", "너", "내", "네", "노", "느", "니", "더", 
+                "데", "도", "두", "뒤", "드", "디", "떠", "또", "러", "레", "로", "루", "리", 
+                "머", "매", "메", "모", "무", "미", "버", "배", "베", "보", "부", "비", "빠", 
+                "뿌", "삐", "서", "새", "세", "소", "수", "스", "시", "써", "쏘", "쓰", "씨", 
+                "저", "재", "제", "조", "주", "지", "짜", "찌", "처", "채", "체", "초", "추", 
+                "치", "코", "쿠", "크", "키", "토", "투", "티", "포", "푸", "피", "해", "회", 
+                "후", "휴", "희", "히"
+            ],
+            3: [
+                "악", "안", "알", "암", "압", "앗", "앙", "앞", "억", "언", "얼", "엄", "업", 
+                "엇", "엉", "엎", "옥", "온", "올", "옴", "옵", "옷", "옹", "옻", "욱", "운", 
+                "울", "움", "웁", "웃", "웅", "익", "인", "일", "임", "입", "잇", "잉", "잎",
+                "앎", "앓", "잃", "읊", "옭"
+            ],
+            4: [
+                "밥", "물", "국", "죽", "발", "손", "눈", "몸", "책", "집", "돈", "돌", "닭", 
+                "흙", "삶", "맛", "밤", "낮", "낯", "빛", "꽃", "밭", "숲", "강", "산", "들", 
+                "길", "감", "귤", "공", "말", "줄", "칼", "활", "솔", "술", "탑", "컵", "풀", 
+                "불", "쌀", "밀", "콩", "팥", "묵", "떡", "갓", "값", "깃", "겉", "곁", "곱", 
+                "곳", "곰", "곱", "김", "깊", "끝", "끈", "뜰", "땀", "닻", "덫", "댐", "덫",
+                "돛", "몫", "목", "문", "벽", "펜", "풀", "흙", "벼", "잠", "꿈", "춤", "짐"
+            ]
+        };
+    </script>
+
+    <!-- 상단 네비게이션 & 게임 타이틀 -->
+    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md px-6 py-4 sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <span class="text-3xl">🎯</span>
+                <div>
+                    <h1 class="font-black text-xl md:text-2xl bg-clip-text text-transparent bg-gradient-to-r from-violet-400 via-fuchsia-400 to-amber-400">
+                        초성·중성·종성 탈출기!
+                    </h1>
+                    <p class="text-xs text-slate-400">중학교 3학년 국어 음운 결합 완전 정복 게임</p>
+                </div>
+            </div>
+            <!-- 볼륨 및 가이드 뱃지 -->
+            <div class="flex items-center gap-3">
+                <button onclick="toggleAudio()" id="sound-btn" class="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-xs font-bold transition flex items-center gap-1">
+                    🔊 소리 켬
+                </button>
+                <div class="px-3 py-1.5 rounded-full bg-violet-950/50 border border-violet-800 text-xs font-bold text-violet-300">
+                    음운론 스페셜 💡
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 콘텐츠 영역 -->
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-6 flex flex-col justify-center">
+
+        <!-- [SCREEN 1] 인트로 및 수업 학습 목표 화면 -->
+        <section id="intro-screen" class="space-y-8 max-w-3xl mx-auto text-center py-10">
+            <div class="space-y-4">
+                <div class="inline-block px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-semibold pulse-active">
+                    흥미 유발 100%! 국어 수업 시작하기
+                </div>
+                <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
+                    자모를 모아 한 글자를 만드는 <br>
+                    <span class="text-violet-400">음운 결합 서바이벌</span>
+                </h2>
+                <p class="text-slate-400 text-lg max-w-xl mx-auto">
+                    한글은 자음과 모음이 결합하여 하나의 완벽한 소리(음절)를 이룹니다. 제한된 시간 속에서 최고의 음절 구조 달인이 되어 보세요!
+                </p>
+            </div>
+
+            <!-- 학습 가이드 카드 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-left">
+                <div class="bg-slate-900 border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden group hover:border-violet-500/50 transition">
+                    <div class="absolute top-0 right-0 p-3 text-3xl font-black text-slate-800/40 select-none">1</div>
+                    <span class="text-xs font-bold text-violet-400 block mb-1">1 Round (10초)</span>
+                    <h4 class="font-bold text-base text-slate-100 mb-2">모음으로만</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">첫소리에 음가가 없는 'ㅇ'이 오고 모음만 있는 글자<br><span class="text-amber-300 font-semibold">(예: 아, 오, 이)</span></p>
+                </div>
+                <div class="bg-slate-900 border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden group hover:border-violet-500/50 transition">
+                    <div class="absolute top-0 right-0 p-3 text-3xl font-black text-slate-800/40 select-none">2</div>
+                    <span class="text-xs font-bold text-violet-400 block mb-1">2 Round (30초)</span>
+                    <h4 class="font-bold text-base text-slate-100 mb-2">자음 + 모음</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">첫소리에 소리 나는 자음이 오고 모음이 결합한 글자<br><span class="text-amber-300 font-semibold">(예: 나, 소, 비)</span></p>
+                </div>
+                <div class="bg-slate-900 border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden group hover:border-violet-500/50 transition">
+                    <div class="absolute top-0 right-0 p-3 text-3xl font-black text-slate-800/40 select-none">3</div>
+                    <span class="text-xs font-bold text-violet-400 block mb-1">3 Round (30초)</span>
+                    <h4 class="font-bold text-base text-slate-100 mb-2">모음 + 자음</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">첫소리는 음가 없는 'ㅇ', 그리고 모음과 받침이 있는 글자<br><span class="text-amber-300 font-semibold">(예: 알, 옷, 입)</span></p>
+                </div>
+                <div class="bg-slate-900 border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden group hover:border-violet-500/50 transition">
+                    <div class="absolute top-0 right-0 p-3 text-3xl font-black text-slate-800/40 select-none">4</div>
+                    <span class="text-xs font-bold text-violet-400 block mb-1">4 Round (40초)</span>
+                    <h4 class="font-bold text-base text-slate-100 mb-2">자음+모음+자음</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">초성, 중성, 종성이 모두 채워진 가장 완전한 글자 구조<br><span class="text-amber-300 font-semibold">(예: 밥, 물, 책)</span></p>
+                </div>
+            </div>
+
+            <!-- 2인용 짝꿍 모드 이름 설정 박스 (숨김 처리 후 활성화) -->
+            <div id="partner-setup-box" class="hidden max-w-md mx-auto bg-slate-900 border border-slate-800 p-6 rounded-2xl text-left space-y-4 shadow-xl">
+                <h3 class="font-bold text-slate-200 flex items-center gap-2">
+                    <span>👥 짝꿍의 이름을 알려주세요!</span>
+                </h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 font-bold">플레이어 1 (선발)</label>
+                        <input type="text" id="player1-name-input" value="짝꿍 A" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-violet-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 font-bold">플레이어 2 (후발)</label>
+                        <input type="text" id="player2-name-input" value="짝꿍 B" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-violet-500 outline-none">
+                    </div>
+                </div>
+                <button onclick="startPartnerGameActual()" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold rounded-xl transition">
+                    🔥 짝꿍 모드 게임 시작!
+                </button>
+            </div>
+
+            <!-- 모드 선택 및 플레이 시작 -->
+            <div id="mode-selection-buttons" class="pt-4 flex flex-col sm:flex-row justify-center items-center gap-4">
+                <button onclick="startGame('single')" class="w-full sm:w-auto px-6 py-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 rounded-xl font-extrabold text-base text-white shadow-lg shadow-violet-900/30 transition-all hover:scale-105 active:scale-95">
+                    🎮 개인전/조별 연습
+                </button>
+                <button onclick="showPartnerSetup()" class="w-full sm:w-auto px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 rounded-xl font-extrabold text-base text-white shadow-lg shadow-emerald-900/20 transition-all hover:scale-105 active:scale-95">
+                    👥 2인 짝꿍 협동 모드
+                </button>
+                <button onclick="startGame('classroom')" class="w-full sm:w-auto px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 rounded-xl font-extrabold text-base text-white shadow-lg shadow-amber-900/20 transition-all hover:scale-105 active:scale-95">
+                    🏫 교실 칠판용 보드
+                </button>
+            </div>
+            
+            <p class="text-xs text-slate-500">💡 Tip: 교실 보드 모드는 대형 화면에 띄우고 다같이 소리치며 단어를 추가하기에 제격입니다.</p>
+        </section>
+
+        <!-- [SCREEN 2] 본 게임 화면 -->
+        <section id="game-screen" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 my-4">
+            
+            <!-- 왼쪽/중앙 컬럼: 게임 인풋 및 챌린지 영역 (2칸 차지) -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- 상단 라운드 스테이터스 바 -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 relative overflow-hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <span id="round-badge" class="px-3 py-1 text-xs font-black rounded-full bg-violet-500 text-white uppercase tracking-wider">ROUND 1</span>
+                            <h3 id="round-title" class="text-2xl font-extrabold text-slate-100 mt-2">모음으로만 구성된 한글자</h3>
+                        </div>
+                        <!-- 타이머 원형/문자 결합형 -->
+                        <div class="text-right">
+                            <span class="text-xs text-slate-400 block font-semibold">남은 시간</span>
+                            <span id="timer-text" class="text-4xl font-black text-amber-400 font-mono tracking-tighter">10</span>
+                            <span class="text-xs text-slate-400 font-semibold font-mono">초</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 프로그레스 타임 바 -->
+                    <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800/50">
+                        <div id="timer-bar" class="bg-gradient-to-r from-violet-500 via-pink-500 to-amber-400 h-full w-full transition-all duration-1000"></div>
+                    </div>
+                    
+                    <!-- 현재 라운드 조건 요약 -->
+                    <div id="round-guide-bar" class="mt-4 p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 flex items-center gap-3">
+                        <span class="text-xl">💡</span>
+                        <p class="text-xs text-slate-300" id="round-description">설명 영역</p>
+                    </div>
+                </div>
+
+                <!-- 2인용 짝꿍 차례 안내용 UI -->
+                <div id="partner-turn-panel" class="hidden bg-slate-900/90 border border-emerald-800/60 rounded-2xl p-4 flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">🔥</span>
+                        <div>
+                            <p class="text-xs text-slate-400 font-bold">지금 차례</p>
+                            <h4 id="active-player-announcement" class="text-lg font-black text-emerald-400">김철수 차례!</h4>
+                        </div>
+                    </div>
+                    <div class="flex gap-4 text-xs font-semibold text-slate-400">
+                        <div id="p1-stats-chip" class="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800">
+                            <span id="p1-label">A</span>: <span id="p1-score-display" class="text-emerald-400 font-bold">0</span>개
+                        </div>
+                        <div id="p2-stats-chip" class="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800">
+                            <span id="p2-label">B</span>: <span id="p2-score-display" class="text-indigo-400 font-bold">0</span>개
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 메인 게임 보드 패널 -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-center space-y-6 relative">
+                    
+                    <!-- 실시간 음운 결합 시각화 가상 패드 (중요 교육적 기능) -->
+                    <div class="w-full max-w-sm">
+                        <p class="text-xs font-bold text-center text-slate-400 mb-2">실시간 한글 음절 결합 판정판</p>
+                        <div class="grid grid-cols-2 gap-2 border border-slate-700/60 p-2 rounded-xl bg-slate-950">
+                            <!-- 초성 (자음) 블록 -->
+                            <div id="visual-cho" class="h-16 rounded-lg bg-slate-900 border border-slate-800 flex flex-col justify-center items-center transition-all">
+                                <span class="text-[10px] font-bold text-slate-500">초성 (첫소리 자음)</span>
+                                <span id="visual-cho-val" class="text-xl font-bold text-slate-400">-</span>
+                            </div>
+                            <!-- 중성 (모음) 블록 -->
+                            <div id="visual-jung" class="h-16 rounded-lg bg-slate-900 border border-slate-800 flex flex-col justify-center items-center transition-all">
+                                <span class="text-[10px] font-bold text-slate-500">중성 (가운뎃소리 모음)</span>
+                                <span id="visual-jung-val" class="text-xl font-bold text-slate-400">-</span>
+                            </div>
+                            <!-- 종성 (받침 자음) 블록 -->
+                            <div id="visual-jong" class="col-span-2 h-14 rounded-lg bg-slate-900 border border-slate-800 flex flex-col justify-center items-center transition-all">
+                                <span class="text-[10px] font-bold text-slate-500">종성 (끝소리 받침)</span>
+                                <span id="visual-jong-val" class="text-xl font-bold text-slate-400">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 단어 입력 폼 -->
+                    <div class="w-full max-w-md space-y-3">
+                        <div class="relative">
+                            <input type="text" id="word-input" maxlength="2" placeholder="한 글자를 입력하세요!" 
+                                class="w-full bg-slate-950 border-2 border-slate-800 focus:border-violet-500 rounded-2xl py-5 px-6 text-center text-4xl font-extrabold text-white tracking-widest outline-none transition focus:ring-4 focus:ring-violet-950/50"
+                                autofocus autocomplete="off">
+                            <div id="input-helper" class="absolute right-4 top-1/2 -translate-y-1/2 text-2xl"></div>
+                        </div>
+                        
+                        <!-- 안내 에러 메시지 팝업 형태 -->
+                        <div id="validation-msg" class="text-center text-sm font-semibold text-rose-400 min-h-[20px] transition duration-200"></div>
+
+                        <!-- 조작 가이드 안내 및 힌트 -->
+                        <div class="text-center text-xs text-slate-400">
+                            <kbd class="px-2 py-1 rounded bg-slate-800 text-[10px] font-mono text-slate-300">Enter</kbd> 키를 누르거나 등록 버튼으로 단어를 제출하세요.
+                        </div>
+
+                        <!-- 제출 및 패스 버튼들 -->
+                        <div class="flex gap-2">
+                            <button onclick="submitWord()" class="flex-2 flex-grow-[2] py-4 bg-violet-600 hover:bg-violet-500 text-white font-extrabold rounded-xl shadow-lg transition active:scale-95">
+                                🚀 단어 등록
+                            </button>
+                            <!-- 2인 모드용 기권/패스 버튼 -->
+                            <button onclick="passTurn()" id="partner-pass-btn" class="hidden px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition border border-slate-700/50 flex flex-col justify-center items-center gap-1">
+                                <span>🔄 다음</span>
+                                <span>플레이어</span>
+                            </button>
+                            <!-- 교사용 특별 검수 오버라이드 버튼 (실시간 실재 단어 심사 가변성 방지) -->
+                            <button onclick="forceAcceptWord()" id="teacher-pass-btn" class="px-4 bg-slate-800 hover:bg-amber-600/20 hover:text-amber-300 text-slate-400 font-bold text-xs rounded-xl transition border border-slate-700/50" title="사전에 없어도 올바른 단어라면 강제 인정!">
+                                👨‍🏫 교사 승인
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 오른쪽 사이드바: 획득 점수 및 이번 라운드 입력 완료 단어 현황 -->
+            <div class="space-y-6">
+                <!-- 대형 스코어 대시보드 -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 text-center relative overflow-hidden">
+                    <span class="text-xs font-bold text-slate-400 tracking-wider block uppercase mb-1">CURRENT SCORE</span>
+                    <h3 id="current-score" class="text-6xl font-black text-violet-400 font-mono">0</h3>
+                    
+                    <div class="mt-4 grid grid-cols-2 gap-2 border-t border-slate-800 pt-4 text-xs font-semibold text-slate-400">
+                        <div>단어 성공: <span id="count-success" class="text-slate-200 font-bold font-mono">0</span>개</div>
+                        <div>보너스 획득: <span id="count-bonus" class="text-amber-400 font-bold font-mono">0</span>점</div>
+                    </div>
+                </div>
+
+                <!-- 제출한 단어 목록 현황 -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 flex flex-col h-[340px]">
+                    <h4 class="font-extrabold text-sm text-slate-200 mb-3 flex justify-between items-center">
+                        <span>성공한 단어 (<span id="success-list-count" class="font-mono text-violet-400">0</span>)</span>
+                        <span class="text-[10px] font-normal text-slate-400">초록=사전 확인, 주황=승인 단어</span>
+                    </h4>
+                    
+                    <!-- 단어 스크롤 박스 -->
+                    <div id="entered-words-container" class="flex-grow overflow-y-auto pr-1 space-y-2 text-slate-300">
+                        <div id="empty-list-placeholder" class="h-full flex flex-col justify-center items-center text-center text-slate-500 py-10">
+                            <span class="text-3xl mb-2">📥</span>
+                            <p class="text-xs">이곳에 성공적으로 조합된<br>단어들이 나열됩니다.</p>
+                        </div>
+                        <div id="words-grid" class="grid grid-cols-4 gap-2">
+                            <!-- 단어 칩 카드들이 동적으로 추가되는 공간 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- [SCREEN 3] 게임 최종 종료 리포트 & 교과 연계 빌드업 학습 피드백 -->
+        <section id="result-screen" class="hidden max-w-3xl mx-auto space-y-8 py-6">
+            <div class="bg-gradient-to-br from-slate-900 via-indigo-950/30 to-slate-900 border border-slate-800 p-8 rounded-3xl text-center space-y-6 relative overflow-hidden">
+                <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.15),transparent_50%)]"></div>
+                
+                <div class="space-y-2 relative z-10">
+                    <span class="text-5xl">🏆</span>
+                    <h2 class="text-3xl font-extrabold text-slate-100">게임 완료! 수고하셨습니다!</h2>
+                    <p class="text-sm text-slate-400">오늘 배운 자음과 모음의 결합 규칙을 정리해보는 시간입니다.</p>
+                </div>
+
+                <!-- 짝꿍 결과 분석 섹션 (협동 모드 시 활성화) -->
+                <div id="partner-report-box" class="hidden bg-slate-950/80 p-5 rounded-2xl border border-emerald-950 max-w-lg mx-auto text-left space-y-3 relative z-10">
+                    <h4 class="font-bold text-emerald-400 flex items-center gap-1 text-sm">
+                        <span>🤝 짝꿍 협동 분석 보고서</span>
+                    </h4>
+                    <div class="grid grid-cols-2 gap-4 text-xs">
+                        <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                            <span id="final-p1-label" class="font-bold block text-slate-400">플레이어1</span>
+                            <span id="final-p1-count" class="text-xl font-bold text-emerald-400 font-mono">0</span> 개 성공
+                        </div>
+                        <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                            <span id="final-p2-label" class="font-bold block text-slate-400">플레이어2</span>
+                            <span id="final-p2-count" class="text-xl font-bold text-indigo-400 font-mono">0</span> 개 성공
+                        </div>
+                    </div>
+                    <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800 text-xs">
+                        <p class="text-slate-400">두 사람의 찰떡궁합 지수: <span id="partner-harmony-ratio" class="text-amber-400 font-bold">100%</span></p>
+                        <p id="partner-harmony-comment" class="text-slate-300 mt-1 font-semibold">"서로 양보하며 아주 완벽하게 소통했군요!"</p>
+                    </div>
+                </div>
+
+                <!-- 점수 요약 정보 -->
+                <div class="grid grid-cols-3 gap-4 max-w-lg mx-auto py-4 relative z-10">
+                    <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-800/80">
+                        <span class="text-xs text-slate-400 block mb-1">최종 스코어</span>
+                        <span id="final-score" class="text-3xl font-black text-violet-400 font-mono">150</span>
+                    </div>
+                    <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-800/80">
+                        <span class="text-xs text-slate-400 block mb-1">통과 단어 수</span>
+                        <span id="final-words" class="text-3xl font-black text-slate-100 font-mono">12</span>
+                    </div>
+                    <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-800/80">
+                        <span class="text-xs text-slate-400 block mb-1">평가 등급</span>
+                        <span id="final-rank" class="text-xl font-bold text-amber-400">세종대왕</span>
+                    </div>
+                </div>
+
+                <!-- 하단 교과 수업 연계 빌드업 핵심 노트 (선생님 교육 편의용) -->
+                <div class="bg-slate-950/80 p-6 rounded-2xl border border-slate-800/80 text-left space-y-4">
+                    <h4 class="font-extrabold text-base text-violet-300 flex items-center gap-2">
+                        <span>👩‍🏫 배운 내용을 쏙쏙 정리하는 음운론 핵심 노트!</span>
+                    </h4>
+                    <div class="space-y-3 text-sm text-slate-300 leading-relaxed">
+                        <p>
+                            <strong class="text-amber-300">1. 첫소리 'ㅇ'의 비밀 (1라운드 & 3라운드):</strong><br>
+                            '아'나 '옷'의 첫소리에 있는 'ㅇ'은 단지 빈자리를 채우는 문장 부호일 뿐, <span class="text-violet-400 underline decoration-violet-500 underline-offset-4 font-bold">실제 소릿값(음가)이 존재하지 않습니다.</span> 따라서 '아'는 오직 **모음 단독**으로만 소리가 나는 음절 구조입니다!
+                        </p>
+                        <p>
+                            <strong class="text-amber-300">2. 음소의 정의와 가치:</strong><br>
+                            '나'의 모음을 바꾸어 '너'가 되거나, '밥'의 초성을 바꾸어 '잡'이 될 때 단어의 뜻이 완전히 달라지게 되죠. 이처럼 <span class="text-violet-400 underline decoration-violet-500 underline-offset-4 font-bold">뜻을 구별해 주는 가장 작은 소리의 단위</span>를 우리는 **'음운'**이라고 부릅니다.
+                        </p>
+                        <p>
+                            <strong class="text-amber-300">3. 한글의 뛰어난 모아쓰기:</strong><br>
+                            한글은 영어(r-u-n)처럼 풀어쓰지 않고 초성, 중성, 종성을 한 네모 틀 안에 **'모아쓰기'** 함으로써 눈으로 식별하고 음절 단위로 읽기 최적화된 우수한 구조를 가집니다.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 재시작 버튼 단 -->
+                <div class="flex flex-col sm:flex-row justify-center gap-4 pt-4 relative z-10">
+                    <button onclick="restartGame()" class="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl shadow-lg transition active:scale-95">
+                        🔄 다시 처음부터 도전
+                    </button>
+                    <button onclick="downloadRecord()" class="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl transition border border-slate-700/50">
+                        💾 이번 결과 기록 복사하기
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 하단 카피라이트 및 상태 표시줄 -->
+    <footer class="border-t border-slate-900 bg-slate-950/80 py-4 text-center text-xs text-slate-500">
+        <p>© 2026 중학교 3학년 국어 수업 교구 - 한글 음운 결합 완전 정복 프로젝트</p>
+    </footer>
+
+    <!-- 긴급 카운트다운 대형 오버레이 (마지막 5초용, 입력 상자 타자 입력 방해 금지를 위해 pointer-events-none 사용) -->
+    <div id="urgent-countdown-overlay" class="fixed inset-0 flex items-center justify-center pointer-events-none z-40 hidden">
+        <span id="urgent-countdown-number" class="text-[18rem] md:text-[28rem] font-black text-rose-500/35 font-mono scale-50 select-none">5</span>
+    </div>
+
+    <!-- 게임 시작 카운트다운 모달 레이어 (심장 쫄깃한 긴장감 생성) -->
+    <div id="countdown-modal" class="fixed inset-0 bg-slate-950/95 z-50 flex flex-col justify-center items-center transition-all duration-300 opacity-0 pointer-events-none">
+        <div class="text-center space-y-4">
+            <span id="countdown-round-label" class="px-4 py-1 rounded-full bg-violet-900/40 text-violet-300 font-black tracking-widest text-sm uppercase">ROUND 1 STARTING</span>
+            <h1 id="countdown-number" class="text-9xl font-black text-amber-400 font-mono tracking-tighter scale-75 transition-transform duration-500">3</h1>
+            <p id="countdown-text" class="text-slate-400 text-lg font-bold">준비하세요!</p>
+        </div>
+    </div>
+
+    <script>
+        // 게임 상태 저장소
+        const gameState = {
+            isPlaying: false,
+            gameMode: 'single', // 'single', 'classroom', 'partner'
+            currentRound: 1,
+            timeRemaining: 10,
+            timerId: null,
+            score: 0,
+            successCount: 0,
+            bonusPoints: 0,
+            soundEnabled: true,
+            enteredWords: [], // { word: '아', round: 1, score: 10, verified: true, player: 1/2 }
+            roundDurations: {
+                1: 30, // 1라운드 30초
+                2: 50, // 2라운드 50초
+                3: 50, // 3라운드 50초
+                4: 60  // 4라운드 60초 (1분)
+            },
+            // 2인 짝꿍용 추가 상태
+            partnerMode: {
+                p1Name: "짝꿍 A",
+                p2Name: "짝꿍 B",
+                p1Count: 0,
+                p2Count: 0,
+                activePlayer: 1 // 1 or 2
+            }
+        };
+
+        // DOM 객체들 캐싱
+        const DOMElements = {
+            introScreen: document.getElementById('intro-screen'),
+            gameScreen: document.getElementById('game-screen'),
+            resultScreen: document.getElementById('result-screen'),
+            countdownModal: document.getElementById('countdown-modal'),
+            countdownNumber: document.getElementById('countdown-number'),
+            countdownText: document.getElementById('countdown-text'),
+            countdownRoundLabel: document.getElementById('countdown-round-label'),
+            soundBtn: document.getElementById('sound-btn'),
+            roundBadge: document.getElementById('round-badge'),
+            roundTitle: document.getElementById('round-title'),
+            timerText: document.getElementById('timer-text'),
+            timerBar: document.getElementById('timer-bar'),
+            roundDescription: document.getElementById('round-description'),
+            wordInput: document.getElementById('word-input'),
+            validationMsg: document.getElementById('validation-msg'),
+            currentScore: document.getElementById('current-score'),
+            countSuccess: document.getElementById('count-success'),
+            countBonus: document.getElementById('count-bonus'),
+            emptyListPlaceholder: document.getElementById('empty-list-placeholder'),
+            wordsGrid: document.getElementById('words-grid'),
+            successListCount: document.getElementById('success-list-count'),
+            finalScore: document.getElementById('final-score'),
+            finalWords: document.getElementById('final-words'),
+            finalRank: document.getElementById('final-rank'),
+            visualCho: document.getElementById('visual-cho'),
+            visualChoVal: document.getElementById('visual-cho-val'),
+            visualJung: document.getElementById('visual-jung'),
+            visualJungVal: document.getElementById('visual-jung-val'),
+            visualJong: document.getElementById('visual-jong'),
+            visualJongVal: document.getElementById('visual-jong-val'),
+            teacherPassBtn: document.getElementById('teacher-pass-btn'),
+            inputHelper: document.getElementById('input-helper'),
+            // 짝꿍 모드용 추가 DOM 캐싱
+            partnerSetupBox: document.getElementById('partner-setup-box'),
+            modeSelectionButtons: document.getElementById('mode-selection-buttons'),
+            p1NameInput: document.getElementById('player1-name-input'),
+            p2NameInput: document.getElementById('player2-name-input'),
+            partnerTurnPanel: document.getElementById('partner-turn-panel'),
+            activePlayerAnnouncement: document.getElementById('active-player-announcement'),
+            p1ScoreDisplay: document.getElementById('p1-score-display'),
+            p2ScoreDisplay: document.getElementById('p2-score-display'),
+            p1Label: document.getElementById('p1-label'),
+            p2Label: document.getElementById('p2-label'),
+            partnerPassBtn: document.getElementById('partner-pass-btn'),
+            partnerReportBox: document.getElementById('partner-report-box'),
+            finalP1Label: document.getElementById('final-p1-label'),
+            finalP2Label: document.getElementById('final-p2-label'),
+            finalP1Count: document.getElementById('final-p1-count'),
+            finalP2Count: document.getElementById('final-p2-count'),
+            partnerHarmonyRatio: document.getElementById('partner-harmony-ratio'),
+            partnerHarmonyComment: document.getElementById('partner-harmony-comment')
+        };
+
+        // 소리 설정 토글
+        function toggleAudio() {
+            gameState.soundEnabled = !gameState.soundEnabled;
+            if (gameState.soundEnabled) {
+                DOMElements.soundBtn.innerText = "🔊 소리 켬";
+                DOMElements.soundBtn.classList.replace('bg-slate-900', 'bg-slate-800');
+                SoundFX.play('tick');
+            } else {
+                DOMElements.soundBtn.innerText = "🔇 소리 끔";
+                DOMElements.soundBtn.classList.replace('bg-slate-800', 'bg-slate-900');
+            }
+        }
+
+        // 키 입력 리스너 및 음운 시각화 판정판 업데이트 연동
+        DOMElements.wordInput.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            // 한 글자 초과 입력 방지 및 마지막 글자 강제 선택
+            if (val.length > 1) {
+                DOMElements.wordInput.value = val.charAt(val.length - 1);
+            }
+            updatePhonemeVisualizer(DOMElements.wordInput.value);
+        });
+
+        DOMElements.wordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitWord();
+            }
+        });
+
+        /**
+         * 입력값에 따라 초성, 중성, 종성 비주얼라이저의 상태를 실시간 변경합니다.
+         * @param {string} char 
+         */
+        function updatePhonemeVisualizer(char) {
+            DOMElements.validationMsg.innerText = "";
+            if (!char) {
+                resetVisualizerUI();
+                return;
+            }
+
+            const dec = decomposeHangul(char);
+            if (!dec) {
+                // 한글이 아니거나 완성되지 않은 결합체 입력 시
+                DOMElements.visualChoVal.innerText = "-";
+                DOMElements.visualJungVal.innerText = "-";
+                DOMElements.visualJongVal.innerText = "-";
+                
+                // 불완전 조합 가이드라인 (초성 단독, 모음 단독 등)
+                if (char.match(/[ㄱ-ㅎ]/)) {
+                    DOMElements.visualChoVal.innerText = char;
+                    highlightBlock('cho', true);
+                    highlightBlock('jung', false);
+                    highlightBlock('jong', false);
+                    DOMElements.inputHelper.innerHTML = "🧩";
+                } else if (char.match(/[ㅏ-ㅣ]/)) {
+                    DOMElements.visualJungVal.innerText = char;
+                    highlightBlock('cho', false);
+                    highlightBlock('jung', true);
+                    highlightBlock('jong', false);
+                    DOMElements.inputHelper.innerHTML = "🧩";
+                } else {
+                    DOMElements.inputHelper.innerHTML = "❌";
+                }
+                return;
+            }
+
+            // 올바른 한글 완성형 자소 결합체 분석 완료시
+            DOMElements.visualChoVal.innerText = dec.cho || '-';
+            DOMElements.visualJungVal.innerText = dec.jung || '-';
+            DOMElements.visualJongVal.innerText = dec.jong || '없음';
+
+            // 라운드별 목표 구조 매칭 확인 및 보드 하이라이팅
+            const round = gameState.currentRound;
+            let matchRule = checkRoundStructure(dec, round);
+
+            highlightBlock('cho', dec.hasInitialSound);
+            highlightBlock('jung', true);
+            highlightBlock('jong', dec.hasFinalSound);
+
+            if (matchRule) {
+                DOMElements.inputHelper.innerHTML = "✅";
+                DOMElements.wordInput.classList.remove('border-rose-500');
+                DOMElements.wordInput.classList.add('border-emerald-500');
+            } else {
+                DOMElements.inputHelper.innerHTML = "⚠️";
+                DOMElements.wordInput.classList.remove('border-emerald-500');
+                DOMElements.wordInput.classList.add('border-rose-500');
+            }
+        }
+
+        function highlightBlock(type, active) {
+            const el = type === 'cho' ? DOMElements.visualCho : type === 'jung' ? DOMElements.visualJung : DOMElements.visualJong;
+            if (active) {
+                el.classList.remove('bg-slate-900', 'border-slate-800', 'text-slate-500');
+                el.classList.add('bg-violet-950/40', 'border-violet-600', 'text-violet-300');
+            } else {
+                el.classList.remove('bg-violet-950/40', 'border-violet-600', 'text-violet-300');
+                el.classList.add('bg-slate-900', 'border-slate-800', 'text-slate-500');
+            }
+        }
+
+        function resetVisualizerUI() {
+            DOMElements.visualChoVal.innerText = "-";
+            DOMElements.visualJungVal.innerText = "-";
+            DOMElements.visualJongVal.innerText = "-";
+            DOMElements.inputHelper.innerHTML = "";
+            DOMElements.wordInput.classList.remove('border-emerald-500', 'border-rose-500');
+            DOMElements.wordInput.classList.add('border-slate-800');
+            highlightBlock('cho', false);
+            highlightBlock('jung', false);
+            highlightBlock('jong', false);
+        }
+
+        function showPartnerSetup() {
+            DOMElements.partnerSetupBox.classList.remove('hidden');
+            DOMElements.modeSelectionButtons.classList.add('hidden');
+            if (gameState.soundEnabled) SoundFX.play('tick');
+        }
+
+        function startPartnerGameActual() {
+            const p1 = DOMElements.p1NameInput.value.trim() || "짝꿍 A";
+            const p2 = DOMElements.p2NameInput.value.trim() || "짝꿍 B";
+            
+            gameState.partnerMode.p1Name = p1;
+            gameState.partnerMode.p2Name = p2;
+            gameState.partnerMode.p1Count = 0;
+            gameState.partnerMode.p2Count = 0;
+            gameState.partnerMode.activePlayer = 1; // 1번 먼저 시작
+
+            // UI Label 반영
+            DOMElements.p1Label.innerText = p1;
+            DOMElements.p2Label.innerText = p2;
+            DOMElements.p1ScoreDisplay.innerText = "0";
+            DOMElements.p2ScoreDisplay.innerText = "0";
+
+            startGame('partner');
+        }
+
+        // 게임 시작 실행 관리
+        function startGame(mode) {
+            gameState.gameMode = mode;
+            gameState.score = 0;
+            gameState.successCount = 0;
+            gameState.bonusPoints = 0;
+            gameState.enteredWords = [];
+            gameState.currentRound = 1;
+
+            DOMElements.introScreen.classList.add('hidden');
+            DOMElements.resultScreen.classList.add('hidden');
+            DOMElements.gameScreen.classList.remove('hidden');
+
+            if (mode === 'partner') {
+                DOMElements.partnerTurnPanel.classList.remove('hidden');
+                DOMElements.partnerPassBtn.classList.remove('hidden');
+                updatePartnerTurnUI();
+            } else {
+                DOMElements.partnerTurnPanel.classList.add('hidden');
+                DOMElements.partnerPassBtn.classList.add('hidden');
+            }
+
+            // 1라운드 예비 카운트다운 가동
+            startRoundTransition(1);
+        }
+
+        function updatePartnerTurnUI() {
+            const pm = gameState.partnerMode;
+            const currentTurnName = (pm.activePlayer === 1) ? pm.p1Name : pm.p2Name;
+            
+            DOMElements.activePlayerAnnouncement.innerText = `${currentTurnName}의 차례입니다! 👈`;
+            
+            // 배지 색상 하이라이트
+            const chip1 = document.getElementById('p1-stats-chip');
+            const chip2 = document.getElementById('p2-stats-chip');
+            
+            if (pm.activePlayer === 1) {
+                chip1.className = "px-3 py-1.5 rounded-lg bg-emerald-950/50 border border-emerald-500 font-bold active-turn-anim";
+                chip2.className = "px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800";
+            } else {
+                chip1.className = "px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800";
+                chip2.className = "px-3 py-1.5 rounded-lg bg-indigo-950/50 border border-indigo-500 font-bold active-turn-anim";
+            }
+            
+            // 인풋박스 플레이스홀더에도 짝꿍 이름 띄우기
+            DOMElements.wordInput.placeholder = `${currentTurnName}님, 글자를 써보세요!`;
+        }
+
+        function passTurn() {
+            if (gameState.gameMode !== 'partner') return;
+            
+            // 턴 바꾸기
+            gameState.partnerMode.activePlayer = (gameState.partnerMode.activePlayer === 1) ? 2 : 1;
+            updatePartnerTurnUI();
+            
+            if (gameState.soundEnabled) SoundFX.play('turn_switch');
+            
+            // 조작 상자 초기화
+            DOMElements.wordInput.value = "";
+            resetVisualizerUI();
+            DOMElements.wordInput.focus();
+        }
+
+        // 라운드 준비용 심장 쫄깃 카운트다운 효과
+        function startRoundTransition(round) {
+            clearInterval(gameState.timerId);
+            gameState.currentRound = round;
+            
+            // 라운드 가이드 변경
+            updateRoundGuideUI(round);
+
+            // 입력 상자 청소 및 비활성화
+            DOMElements.wordInput.value = "";
+            DOMElements.wordInput.disabled = true;
+            resetVisualizerUI();
+
+            // 카운트다운 모달 표출
+            DOMElements.countdownRoundLabel.innerText = `ROUND ${round} 준비`;
+            
+            let timeTexts = ["3", "2", "1", "시작!"];
+            let idx = 0;
+            
+            DOMElements.countdownModal.classList.remove('opacity-0', 'pointer-events-none');
+            DOMElements.countdownNumber.innerText = timeTexts[idx];
+            DOMElements.countdownNumber.style.transform = "scale(0.75)";
+            
+            if (gameState.soundEnabled) SoundFX.play('tick');
+
+            const animInterval = setInterval(() => {
+                idx++;
+                if (idx < timeTexts.length) {
+                    DOMElements.countdownNumber.innerText = timeTexts[idx];
+                    if (gameState.soundEnabled) {
+                        if (idx === timeTexts.length - 1) SoundFX.play('round_start');
+                        else SoundFX.play('tick');
+                    }
+                } else {
+                    clearInterval(animInterval);
+                    DOMElements.countdownModal.classList.add('opacity-0', 'pointer-events-none');
+                    // 본격적인 타이머 기동
+                    startTimer(round);
+                    DOMElements.wordInput.disabled = false;
+                    DOMElements.wordInput.focus();
+                }
+            }, 1000);
+        }
+
+        // 타이머 동작
+        function startTimer(round) {
+            const limit = gameState.roundDurations[round];
+            gameState.timeRemaining = limit;
+            
+            updateTimerUI();
+
+            gameState.timerId = setInterval(() => {
+                gameState.timeRemaining--;
+                updateTimerUI();
+
+                // 마지막 5초 전용 화면 중앙 대형 카운트다운 시각+소리 효과 작동
+                if (gameState.timeRemaining <= 5 && gameState.timeRemaining > 0) {
+                    showUrgentCountdown(gameState.timeRemaining);
+                } else {
+                    hideUrgentCountdown();
+                }
+
+                if (gameState.timeRemaining <= 3 && gameState.timeRemaining > 0) {
+                    if (gameState.soundEnabled) SoundFX.play('warning');
+                    DOMElements.timerText.classList.add('text-rose-500', 'scale-110');
+                } else {
+                    DOMElements.timerText.classList.remove('text-rose-500', 'scale-110');
+                }
+
+                if (gameState.timeRemaining <= 0) {
+                    clearInterval(gameState.timerId);
+                    hideUrgentCountdown(); // 게임 종료 후 안전히 비활성화
+                    handleRoundEnd();
+                }
+            }, 1000);
+        }
+
+        /**
+         * 화면 전면에 박진감 가득한 시간 임박 카운트다운 숫자를 뿌립니다.
+         */
+        function showUrgentCountdown(sec) {
+            const overlay = document.getElementById('urgent-countdown-overlay');
+            const numEl = document.getElementById('urgent-countdown-number');
+            if (!overlay || !numEl) return;
+
+            overlay.classList.remove('hidden');
+            numEl.innerText = sec;
+            
+            // CSS 애니메이션 트리거 초기화 후 재적용
+            numEl.classList.remove('animate-pulse-dramatic');
+            void numEl.offsetWidth; // 브라우저 리플로우 강제 유도
+            numEl.classList.add('animate-pulse-dramatic');
+
+            // 박진감 넘치는 긴급 경고 소리 출력
+            if (gameState.soundEnabled) {
+                SoundFX.play('urgent_tick');
+            }
+        }
+
+        /**
+         * 임박 카운트다운을 화면에서 숨깁니다.
+         */
+        function hideUrgentCountdown() {
+            const overlay = document.getElementById('urgent-countdown-overlay');
+            if (overlay) overlay.classList.add('hidden');
+        }
+
+        function updateTimerUI() {
+            DOMElements.timerText.innerText = gameState.timeRemaining;
+            const max = gameState.roundDurations[gameState.currentRound];
+            const pct = (gameState.timeRemaining / max) * 100;
+            DOMElements.timerBar.style.width = `${pct}%`;
+        }
+
+        // 라운드 정보에 맞춘 UI 텍스트 갱신
+        function updateRoundGuideUI(round) {
+            DOMElements.roundBadge.innerText = `ROUND ${round}`;
+            
+            const titles = {
+                1: "모음으로만 구성된 한 글자",
+                2: "자음 + 모음 구조의 한 글자",
+                3: "모음 + 자음 구조의 한 글자",
+                4: "자음 + 모음 + 자음 구조"
+            };
+            const desc = {
+                1: "초성 자리에 소리가 없는 빈자리 'ㅇ'이 들어오고 뒤에 모음만 존재하는 형태입니다. (예: 아, 오, 이)",
+                2: "소릿값이 있는 진짜 첫소리 자음과 가운뎃소리 모음이 결합한 가장 기본적인 음절 구조입니다. (예: 나, 소, 비, 개)",
+                3: "첫소리는 소릿값 없는 'ㅇ'으로 시작하여, 모음과 받침 자음이 결합한 특이한 형태입니다. (예: 알, 옷, 입, 잎)",
+                4: "초성, 중성, 종성이 모두 비어있지 않고 꽉 차 있는 완벽하고 우수한 한글의 결합 형태입니다. (예: 밥, 물, 책, 꽃)"
+            };
+
+            DOMElements.roundTitle.innerText = titles[round];
+            DOMElements.roundDescription.innerText = desc[round];
+            
+            // 라운드별 컬러 테마 변경으로 시각적 쾌감
+            const colors = {
+                1: 'bg-violet-600',
+                2: 'bg-indigo-600',
+                3: 'bg-pink-600',
+                4: 'bg-amber-500'
+            };
+            DOMElements.roundBadge.className = `px-3 py-1 text-xs font-black rounded-full text-white uppercase tracking-wider ${colors[round]}`;
+        }
+
+        /**
+         * 한글 분해 데이터가 해당 라운드의 법칙에 완전 부합하는지 분석합니다. (Linguistic Verification)
+         */
+        function checkRoundStructure(dec, round) {
+            if (!dec || dec.type !== 'syllable') return false;
+
+            switch (round) {
+                case 1:
+                    // 모음으로만 구성 -> 첫소리 소릿값 없음(초성이 'ㅇ'), 받침 없음
+                    return !dec.hasInitialSound && !dec.hasFinalSound;
+                case 2:
+                    // 자음 + 모음 -> 첫소리 자음 소릿값 있음(초성이 'ㅇ'이 아님), 받침 없음
+                    return dec.hasInitialSound && !dec.hasFinalSound;
+                case 3:
+                    // 모음 + 자음 -> 첫소리 소릿값 없음(초성이 'ㅇ'), 받침 있음
+                    return !dec.hasInitialSound && dec.hasFinalSound;
+                case 4:
+                    // 자음 + 모음 + 자음 -> 첫소리 자음 소릿값 있음(초성 != 'ㅇ'), 받침 있음
+                    return dec.hasInitialSound && dec.hasFinalSound;
+                default:
+                    return false;
+            }
+        }
+
+        // 단어 제출 검수 처리
+        function submitWord() {
+            const word = DOMElements.wordInput.value.trim();
+            if (!word) {
+                showValidationError("⚠️ 단어를 먼저 입력해 주세요!");
+                return;
+            }
+
+            const dec = decomposeHangul(word);
+            if (!dec) {
+                showValidationError("⚠️ 완성된 한글 한 글자만 인정됩니다!");
+                if (gameState.soundEnabled) SoundFX.play('wrong');
+                return;
+            }
+
+            // 중복 단어 입력 검사
+            const isDuplicate = gameState.enteredWords.some(item => item.word === word);
+            if (isDuplicate) {
+                showValidationError(`⚠️ '${word}'(은)는 이미 성공한 단어입니다!`);
+                if (gameState.soundEnabled) SoundFX.play('wrong');
+                return;
+            }
+
+            // 1단계: 음운 결합 구조 규칙 충족 검사
+            const round = gameState.currentRound;
+            const structurePass = checkRoundStructure(dec, round);
+
+            if (!structurePass) {
+                let errorMsgs = {
+                    1: "1라운드는 초성에 진짜 자음이 올 수 없고 받침도 없어야 합니다! (예: 아, 오)",
+                    2: "2라운드는 초성에 'ㅇ'이 아닌 소리 나는 자음이 와야 하고 받침이 없어야 합니다! (예: 가, 나)",
+                    3: "3라운드는 초성에 'ㅇ'만 와야 하고 반드시 끝에 받침이 붙어있어야 합니다! (예: 알, 옷)",
+                    4: "4라운드는 초성에 'ㅇ'이 아닌 진짜 자음이 오고 반드시 끝에 받침도 있어야 합니다! (예: 밥, 물)"
+                };
+                showValidationError(`⚠️ 음운 조합 실패! ${errorMsgs[round]}`);
+                if (gameState.soundEnabled) SoundFX.play('wrong');
+                return;
+            }
+
+            // 2단계: 실제 한글 사전 등록 어휘 여부 검증
+            const isRealWord = DICTIONARIES[round].includes(word);
+            
+            if (isRealWord) {
+                // 검증 성공 완료
+                acceptWord(word, true);
+            } else {
+                // 사전에 누락되었으나 음운 구조는 완벽한 신조어/특수어휘 후보
+                // 교사 승인 대기 또는 경고 알림 후 수락 보류
+                showValidationError(`🤔 구조는 맞지만 신조어인가요? 교사 승인 시 즉시 등록!`);
+                DOMElements.wordInput.classList.remove('border-emerald-500');
+                DOMElements.wordInput.classList.add('border-amber-500');
+                if (gameState.soundEnabled) SoundFX.play('warning');
+            }
+        }
+
+        // 교사가 버튼을 눌러 승인 시 강제로 성공 처리
+        function forceAcceptWord() {
+            const word = DOMElements.wordInput.value.trim();
+            if (!word) return;
+
+            const dec = decomposeHangul(word);
+            if (!dec) return;
+
+            // 구조 검사만 패스하면 통과
+            if (checkRoundStructure(dec, gameState.currentRound)) {
+                acceptWord(word, false); // 교사 승인으로 통과 표시
+            } else {
+                showValidationError("⚠️ 최소한 라운드 음운 결합 규칙(구조)은 맞아야 승인 가능합니다!");
+                if (gameState.soundEnabled) SoundFX.play('wrong');
+            }
+        }
+
+        // 최종 단어 합격 등록 로직
+        function acceptWord(word, verified) {
+            const round = gameState.currentRound;
+            let scoreReward = round * 10; // 라운드 번호에 비례한 점수 지급
+            
+            // 보너스 점수 시스템 (타이머가 넉넉할 때 빠르게 맞출 시 콤보 가산)
+            let speedBonus = 0;
+            const maxDuration = gameState.roundDurations[round];
+            if (gameState.timeRemaining > maxDuration * 0.7) {
+                speedBonus = 5;
+            }
+
+            const totalEarned = scoreReward + speedBonus;
+            gameState.score += totalEarned;
+            gameState.successCount++;
+            if (speedBonus > 0) gameState.bonusPoints += speedBonus;
+
+            // 짝꿍 모드일 경우 개별 점수 및 턴 교대 연산
+            let solver = null;
+            if (gameState.gameMode === 'partner') {
+                solver = gameState.partnerMode.activePlayer;
+                if (solver === 1) {
+                    gameState.partnerMode.p1Count++;
+                    DOMElements.p1ScoreDisplay.innerText = gameState.partnerMode.p1Count;
+                } else {
+                    gameState.partnerMode.p2Count++;
+                    DOMElements.p2ScoreDisplay.innerText = gameState.partnerMode.p2Count;
+                }
+            }
+
+            gameState.enteredWords.push({
+                word: word,
+                round: round,
+                score: totalEarned,
+                verified: verified,
+                player: solver
+            });
+
+            // UI 보드 갱신
+            DOMElements.currentScore.innerText = gameState.score;
+            DOMElements.countSuccess.innerText = gameState.successCount;
+            DOMElements.countBonus.innerText = gameState.bonusPoints;
+
+            appendWordChip(word, verified);
+
+            // 입력 상자 리셋
+            DOMElements.wordInput.value = "";
+            resetVisualizerUI();
+
+            // 짝꿍 모드일 경우 즉시 턴 전환
+            if (gameState.gameMode === 'partner') {
+                gameState.partnerMode.activePlayer = (solver === 1) ? 2 : 1;
+                updatePartnerTurnUI();
+                if (gameState.soundEnabled) SoundFX.play('turn_switch');
+            }
+
+            DOMElements.wordInput.focus();
+
+            if (gameState.soundEnabled) SoundFX.play('correct');
+        }
+
+        function showValidationError(msg) {
+            DOMElements.validationMsg.innerText = msg;
+        }
+
+        // 성공한 단어 리스트에 뱃지 칩 요소 생성 추가
+        function appendWordChip(word, verified) {
+            DOMElements.emptyListPlaceholder.classList.add('hidden');
+            
+            const chip = document.createElement('div');
+            // 짝꿍 닉네임 노출 태그 생성용 정보
+            let tagHTML = "";
+            if (gameState.gameMode === 'partner') {
+                const isP1 = gameState.partnerMode.activePlayer === 2; // 직전 입력자가 정답 처리되었으므로 turn 인버전 감안
+                const solvedName = isP1 ? gameState.partnerMode.p1Name : gameState.partnerMode.p2Name;
+                const activeColor = isP1 ? 'text-emerald-400' : 'text-indigo-400';
+                tagHTML = `<span class="text-[8px] font-bold ${activeColor}">${solvedName}</span>`;
+            } else {
+                tagHTML = `<span class="text-[9px] text-emerald-500 font-bold">${verified ? '정식어휘' : '교사패스'}</span>`;
+            }
+
+            // 사전 등록 정식어는 초록 계열 테마, 교사 패스는 오렌지빛 테마
+            if (verified) {
+                chip.className = "flex flex-col justify-center items-center bg-emerald-950/40 border border-emerald-500/50 p-2 rounded-xl text-center group transition hover:scale-105 duration-200";
+                chip.innerHTML = `
+                    <span class="text-2xl font-black text-emerald-300">${word}</span>
+                    ${tagHTML}
+                `;
+            } else {
+                chip.className = "flex flex-col justify-center items-center bg-amber-950/40 border border-amber-500/50 p-2 rounded-xl text-center group transition hover:scale-105 duration-200";
+                chip.innerHTML = `
+                    <span class="text-2xl font-black text-amber-300">${word}</span>
+                    ${tagHTML}
+                `;
+            }
+            DOMElements.wordsGrid.appendChild(chip);
+            
+            // 수량 표시기 업데이트
+            DOMElements.successListCount.innerText = gameState.successCount;
+
+            // 스크롤 최하단 이동
+            DOMElements.enteredWordsContainer = document.getElementById('entered-words-container');
+            DOMElements.enteredWordsContainer.scrollTop = DOMElements.enteredWordsContainer.scrollHeight;
+        }
+
+        // 라운드 종료 핸들러
+        function handleRoundEnd() {
+            if (gameState.soundEnabled) SoundFX.play('game_over');
+
+            if (gameState.currentRound < 4) {
+                const nextRound = gameState.currentRound + 1;
+                // 한 라운드가 끝나면 축하 이벤트를 짧게 띄우고 다음 라운드 준비
+                showRoundSummaryAlert(gameState.currentRound, () => {
+                    startRoundTransition(nextRound);
+                });
+            } else {
+                // 4라운드까지 전 일정 종료
+                finishGame();
+            }
+        }
+
+        // 라운드 종료 교사용 간이 성과 브리핑 팝업 (얼럿 모달 자체 제작)
+        function showRoundSummaryAlert(finishedRound, callback) {
+            // 임시 마커 모달 생성
+            const alertBg = document.createElement('div');
+            alertBg.className = "fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4";
+            
+            const countThisRound = gameState.enteredWords.filter(w => w.round === finishedRound).length;
+
+            // 짝꿍 협동 분석용 텍스트
+            let modeContextText = `이번 라운드에서 총 <strong class="text-violet-400 font-mono text-lg">${countThisRound}</strong>개의 단어 결합에 성공하셨습니다!`;
+            if (gameState.gameMode === 'partner') {
+                const wordsP1 = gameState.enteredWords.filter(w => w.round === finishedRound && w.player === 1).length;
+                const wordsP2 = gameState.enteredWords.filter(w => w.round === finishedRound && w.player === 2).length;
+                modeContextText = `
+                    이번 라운드에 함께 힘을 모아 총 <strong class="text-emerald-400 font-mono text-lg">${countThisRound}</strong>개를 완성했습니다!<br>
+                    <span class="text-xs text-slate-400 font-medium">(${gameState.partnerMode.p1Name}: ${wordsP1}개 | ${gameState.partnerMode.p2Name}: ${wordsP2}개)</span>
+                `;
+            }
+
+            alertBg.innerHTML = `
+                <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full text-center space-y-6">
+                    <span class="text-4xl">📢</span>
+                    <h3 class="text-2xl font-extrabold text-slate-100">ROUND ${finishedRound} 종료!</h3>
+                    <p class="text-sm text-slate-300">
+                        ${modeContextText}
+                    </p>
+                    <div class="bg-slate-950 p-4 rounded-xl text-xs text-left text-slate-400 space-y-1">
+                        <span class="font-bold text-slate-200">🔍 국어 교실 탐구 포인트:</span>
+                        <p id="alert-educational-hint"></p>
+                    </div>
+                    <button id="alert-btn-next" class="w-full py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition">
+                        다음 라운드로 가기 👉
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(alertBg);
+
+            // 라운드별 맞춤 학습 힌트 동적 삽입
+            const hints = {
+                1: "첫소리 'ㅇ'은 단지 빈공간을 시각적으로 채우기 위한 껍데기입니다. 소릿값이 없으므로 음운 개수 세기에서도 제외된다는 점을 기억하세요!",
+                2: "초성과 중성이 결합하면 비로소 자음과 모음이 완전히 맞닿은 '가, 나, 다, 소'와 같은 말소리가 납니다. 가장 전형적인 한글의 조음 구조입니다.",
+                3: "첫소리는 없으나 끝소리에 받침이 생기면 자음과 모음의 조화가 독특한 순서를 이룹니다. '옷', '알' 등을 소리 내어 보며 깨달음을 키워보세요."
+            };
+            document.getElementById('alert-educational-hint').innerText = hints[finishedRound];
+
+            document.getElementById('alert-btn-next').onclick = () => {
+                alertBg.remove();
+                callback();
+            };
+        }
+
+        function calculatePartnerHarmony() {
+            const pm = gameState.partnerMode;
+            const total = pm.p1Count + pm.p2Count;
+            if (total === 0) return { ratio: 0, comment: "아직 맞춰낸 단어가 없습니다." };
+
+            // 50:50에 가까울 수록 100%에 근접하는 대칭률 계산
+            const diff = Math.abs(pm.p1Count - pm.p2Count);
+            const ratio = Math.max(0, Math.round(100 - (diff / total) * 100));
+
+            let comment = "";
+            if (ratio >= 85) {
+                comment = "🥇 환상의 환상 찰떡 복비! 대화와 조율이 완벽에 가깝습니다!";
+            } else if (ratio >= 60) {
+                comment = "🥈 준수한 기여 분배! 서로 돕고 끌어주며 우정을 다졌군요.";
+            } else {
+                comment = "⚡ 한 명의 불꽃 캐리가 돋보입니다! 다음엔 턴을 잘 유도해 보세요!";
+            }
+
+            return { ratio, comment };
+        }
+
+        // 전체 게임의 종료 및 총점 산정
+        function finishGame() {
+            clearInterval(gameState.timerId);
+            gameState.isPlaying = false;
+
+            DOMElements.gameScreen.classList.add('hidden');
+            DOMElements.resultScreen.classList.remove('hidden');
+
+            // 점수 표시 반영
+            DOMElements.finalScore.innerText = gameState.score;
+            DOMElements.finalWords.innerText = gameState.successCount;
+
+            // 짝꿍 전용 최종 분석 노출
+            if (gameState.gameMode === 'partner') {
+                DOMElements.partnerReportBox.classList.remove('hidden');
+                
+                DOMElements.finalP1Label.innerText = gameState.partnerMode.p1Name;
+                DOMElements.finalP2Label.innerText = gameState.partnerMode.p2Name;
+                DOMElements.finalP1Count.innerText = gameState.partnerMode.p1Count;
+                DOMElements.finalP2Count.innerText = gameState.partnerMode.p2Count;
+
+                const harmony = calculatePartnerHarmony();
+                DOMElements.partnerHarmonyRatio.innerText = `${harmony.ratio}%`;
+                DOMElements.partnerHarmonyComment.innerText = harmony.comment;
+            } else {
+                DOMElements.partnerReportBox.classList.add('hidden');
+            }
+
+            // 학생 실력 칭호 등급 평가
+            let rank = "음운 훈련생";
+            if (gameState.score >= 120) rank = "세종대왕 극찬";
+            else if (gameState.score >= 80) rank = "집현전 학사";
+            else if (gameState.score >= 40) rank = "훈민정음 수습생";
+            DOMElements.finalRank.innerText = rank;
+        }
+
+        // 처음 게임으로 재부팅
+        function restartGame() {
+            DOMElements.resultScreen.classList.add('hidden');
+            DOMElements.introScreen.classList.remove('hidden');
+            DOMElements.partnerSetupBox.classList.add('hidden');
+            DOMElements.modeSelectionButtons.classList.remove('hidden');
+            DOMElements.wordsGrid.innerHTML = "";
+            DOMElements.emptyListPlaceholder.classList.remove('hidden');
+        }
+
+        // 이번 수업 성적 복사하기 기능
+        function downloadRecord() {
+            let recordText = `=== [초성·중성·종성 탈출기!] 수업 기록 리포트 ===\n`;
+            recordText += `게임 모드: ${gameState.gameMode === 'partner' ? '👥 짝꿍 협동 모드' : '개인전'}\n`;
+            if (gameState.gameMode === 'partner') {
+                recordText += `짝꿍 이름: ${gameState.partnerMode.p1Name} (성공: ${gameState.partnerMode.p1Count}개) & ${gameState.partnerMode.p2Name} (성공: ${gameState.partnerMode.p2Count}개)\n`;
+                const harmony = calculatePartnerHarmony();
+                recordText += `찰떡궁합 지수: ${harmony.ratio}% (${harmony.comment})\n`;
+            }
+            recordText += `최종 총점: ${gameState.score}점\n`;
+            recordText += `전체 성공 어휘수: ${gameState.successCount}개\n`;
+            recordText += `획득 스피드 보너스: ${gameState.bonusPoints}점\n`;
+            recordText += `성공 목록:\n`;
+            
+            gameState.enteredWords.forEach((item, idx) => {
+                let pTag = "";
+                if (gameState.gameMode === 'partner') {
+                    const solverName = (item.player === 1) ? gameState.partnerMode.p1Name : gameState.partnerMode.p2Name;
+                    pTag = ` - 해결사: ${solverName}`;
+                }
+                recordText += `[${idx + 1}] 라운드 ${item.round}: ${item.word} (${item.verified ? '정식 검증' : '선생님 수동 승인'})${pTag}\n`;
+            });
+            
+            // iFrame 샌드박스 제한 우회를 방지한 안전 텍스트 복사 명령어 수행
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = recordText;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    alert('📋 협동 성적이 클립보드에 깔끔하게 복사되었습니다!\n메모장이나 카카오톡, 구글 클래스룸에 붙여넣어 학생들을 칭찬해 주세요.');
+                } else {
+                    alert('복사에 실패했습니다.');
+                }
+            } catch (err) {
+                alert('복사 처리 중 오류 발생: ' + err);
+            }
+            
+            document.body.removeChild(tempTextArea);
+        }
+    </script>
+</body>
+</html>
